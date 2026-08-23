@@ -196,14 +196,13 @@
 
   /* ---------- Marquee ---------- */
   .marquee-strip{background:var(--teal-deep);overflow:hidden;padding:14px 0;border-top:1px solid rgba(255,255,255,.08);border-bottom:1px solid rgba(255,255,255,.08);}
-  .marquee-track{display:flex;width:max-content;animation:marquee 26s linear infinite;}
+  .marquee-track{display:flex;width:max-content;will-change:transform;transform:translate3d(0,0,0);}
   .marquee-track span{
     display:flex;align-items:center;gap:14px;color:var(--white);
     font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:15px;
     padding:0 26px;white-space:nowrap;
   }
   .marquee-track span::after{content:"✦";color:var(--amber);font-size:13px;margin-left:26px;}
-  @keyframes marquee{from{transform:translateX(0);}to{transform:translateX(-50%);}}
 
   /* ---------- Section shell ---------- */
   section{padding:88px 0;position:relative;z-index:1;scroll-margin-top:76px;}
@@ -495,6 +494,7 @@
   <!-- ================= MARQUEE ================= -->
   <div class="marquee-strip">
     <div class="marquee-track" id="marquee">
+      <span>Extraction</span><span>Root Canal Treatment</span><span>Teeth Scaling</span><span>Orthodontics</span><span>Tooth Fillings</span><span>Crown Preparation</span>
       <span>Extraction</span><span>Root Canal Treatment</span><span>Teeth Scaling</span><span>Orthodontics</span><span>Tooth Fillings</span><span>Crown Preparation</span>
       <span>Extraction</span><span>Root Canal Treatment</span><span>Teeth Scaling</span><span>Orthodontics</span><span>Tooth Fillings</span><span>Crown Preparation</span>
     </div>
@@ -800,6 +800,28 @@
   if(lb){
     lb.addEventListener('click', ()=> lb.classList.remove('open'));
   }
+
+  // Marquee: JS-driven (rAF) so it keeps playing reliably on mobile browsers
+  // that throttle or skip pure CSS @keyframes animations (data-saver / battery-saver modes).
+  (function(){
+    const track = document.getElementById('marquee');
+    if(!track) return;
+    const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if(reduceMotion) return; // respect accessibility preference, leave it static
+
+    let x = 0;
+    const speed = 0.55; // px per frame (~33px/s at 60fps)
+    let setWidth = track.scrollWidth / 3; // three repeated sets in the markup
+    window.addEventListener('resize', ()=>{ setWidth = track.scrollWidth / 3; });
+
+    function step(){
+      x -= speed;
+      if(Math.abs(x) >= setWidth){ x += setWidth; }
+      track.style.transform = 'translate3d(' + x + 'px,0,0)';
+      requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  })();
 </script>
 
 </body>
