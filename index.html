@@ -443,7 +443,7 @@
   <section class="hero">
     <div class="wrap hero-grid">
       <div>
-        <div class="eyebrow pulse" id="liveStatus"><span class="dot"></span>Open Today · 11 AM–2 PM</div>
+        <div class="eyebrow pulse" id="liveStatus"><span class="dot"></span>Open Today · Check Hours Below</div>
         <h1>Healthy smiles,<br><span class="accent">honest prices</span>, right on Birsa Road.</h1>
         <svg class="smile-arc" viewBox="0 0 420 40" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M4 6C60 34 360 34 416 6" stroke="#FF6B54" stroke-width="4" stroke-linecap="round" stroke-dasharray="1 14"/>
@@ -459,7 +459,7 @@
         <div class="hero-stats">
           <div class="hero-stat">
             <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
-            <div><b>11 AM – 2 PM</b><small>Mon – Sun</small></div>
+            <div><b>10 AM – 8 PM</b><small>Mon – Sat</small></div>
           </div>
           <div class="hero-stat">
             <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/></svg></div>
@@ -600,7 +600,7 @@
         <p>Every visit starts with a straightforward consultation, so you know what's wrong and what it costs before any treatment begins.</p>
         <ul class="doc-list">
           <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Clear, upfront pricing on every treatment</li>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Open all seven days, 11 AM to 2 PM</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Open Mon–Sat 10 AM–8 PM, Sun 10 AM–2 PM</li>
           <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Centrally located near Hero Cycle &amp; Raymond Showroom</li>
         </ul>
       </div>
@@ -673,10 +673,10 @@
 
         <div class="tl-card reveal">
           <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Clinic Hours</h3>
-          <p>Morning hours only, every day of the week — call ahead so Dr. Kalamuri can plan your slot.</p>
+          <p>Open six days a week with extended hours, and a shorter Sunday window — call ahead so Dr. Kalamuri can plan your slot.</p>
           <div class="hours-table">
-            <div class="hours-row"><b>Monday – Sunday</b><span class="time">11:00 AM – 2:00 PM</span></div>
-            <div class="hours-row"><b>Rest of the day</b><span class="time mono">Closed</span></div>
+            <div class="hours-row"><b>Monday – Saturday</b><span class="time">10:00 AM – 8:00 PM</span></div>
+            <div class="hours-row"><b>Sunday</b><span class="time">10:00 AM – 2:00 PM</span></div>
           </div>
           <a href="tel:+918339087548" class="btn btn-coral" style="margin-top:26px;width:100%;justify-content:center;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.9.34 1.79.64 2.65a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.43-1.21a2 2 0 0 1 2.11-.45c.86.3 1.75.52 2.65.64A2 2 0 0 1 22 16.92z"/></svg>
@@ -739,7 +739,7 @@
         <h4>Contact</h4>
         <ul>
           <li><a href="tel:+918339087548">83390 87548</a></li>
-          <li>11 AM – 2 PM · Mon–Sun</li>
+          <li>Mon–Sat 10 AM–8 PM · Sun 10 AM–2 PM</li>
           <li>Naredi Tower, Birsa Road, Rourkela – 769001</li>
         </ul>
       </div>
@@ -770,20 +770,29 @@
     a.addEventListener('click', ()=>document.getElementById('mmenu').classList.remove('open'));
   });
 
-  // Live open/closed status, based on Asia/Kolkata clinic hours (11 AM – 2 PM daily)
+  // Live open/closed status, based on Asia/Kolkata clinic hours
+  // Mon–Sat: 10 AM – 8 PM · Sunday: 10 AM – 2 PM
   (function(){
     const badge = document.getElementById('liveStatus');
     if(!badge) return;
     try{
-      const istHour = parseInt(new Intl.DateTimeFormat('en-US',{hour:'numeric',hour12:false,timeZone:'Asia/Kolkata'}).format(new Date()),10);
+      const parts = new Intl.DateTimeFormat('en-US',{hour:'numeric',hour12:false,weekday:'short',timeZone:'Asia/Kolkata'}).formatToParts(new Date());
+      const istHour = parseInt(parts.find(p=>p.type==='hour').value,10);
+      const weekday = parts.find(p=>p.type==='weekday').value; // "Sun","Mon",...
+      const isSunday = weekday === 'Sun';
+      const closeHour = isSunday ? 14 : 20;
+      const closeLabel = isSunday ? '2 PM' : '8 PM';
       const dot = '<span class="dot"></span>';
-      if(istHour >= 11 && istHour < 14){
-        badge.innerHTML = dot + 'Open Now · Closes 2 PM';
-      } else if(istHour < 11){
-        badge.innerHTML = dot + 'Opens Today at 11 AM';
+
+      if(istHour >= 10 && istHour < closeHour){
+        badge.innerHTML = dot + 'Open Now · Closes ' + closeLabel;
+      } else if(istHour < 10){
+        badge.innerHTML = dot + 'Opens Today at 10 AM';
         badge.classList.remove('pulse');
       } else {
-        badge.innerHTML = dot + 'Closed · Opens Tomorrow 11 AM';
+        const tomorrowIsSunday = !isSunday && weekday === 'Sat';
+        const nextOpen = tomorrowIsSunday ? '10 AM (Sun hours: 10 AM–2 PM)' : '10 AM';
+        badge.innerHTML = dot + 'Closed · Opens Tomorrow ' + nextOpen;
         badge.classList.remove('pulse');
       }
     }catch(e){ /* keep default text if Intl/timezone unsupported */ }
