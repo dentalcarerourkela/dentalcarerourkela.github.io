@@ -12,6 +12,7 @@
 <meta name="theme-color" content="#0B4F52">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 110'%3E%3Cpath fill='%230E7A78' d='M50 8c-14 0-24 9-24 25 0 13 5 19 7 34 1.5 10 4 24 10.5 24s7.5-13 8.5-20c.5-3 2.5-3 3 0 1 7 2 20 8.5 20S71 80 72.5 67c2-15 7-21 7-34C79.5 17 69.5 8 55.5 8'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://abacus.jasoncameron.dev" crossorigin>
+<link rel="preconnect" href="https://api.counterapi.dev" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
@@ -984,7 +985,7 @@
     const providers = [
       async function abacus(hit){
         try{
-          const j = await fetchJSON('https://abacus.jasoncameron.dev/' + (hit ? 'hit' : 'get') + '/' + NS + '/' + KEY, 8000);
+          const j = await fetchJSON('https://abacus.jasoncameron.dev/' + (hit ? 'hit' : 'get') + '/' + NS + '/' + KEY, 4000);
           if(typeof j.value !== 'number') throw new Error('bad');
           return j.value;
         }catch(e){
@@ -993,29 +994,37 @@
         }
       },
       async function counterapi(hit){
-        const j = await fetchJSON('https://api.counterapi.dev/v1/' + NS + '/' + KEY + (hit ? '/up' : ''), 8000);
+        const j = await fetchJSON('https://api.counterapi.dev/v1/' + NS + '/' + KEY + (hit ? '/up' : ''), 4000);
         const n = j.count !== undefined ? j.count : j.value;
         if(typeof n !== 'number') throw new Error('bad');
         return n;
       }
     ];
 
-    const sleep = ms => new Promise(r=>setTimeout(r, ms));
-
-    async function getLive(){
-      for(let attempt = 0; attempt < 2; attempt++){
-        for(const p of providers){
-          try{
-            const v = await p(doHit);
-            if(doHit){ try{ sessionStorage.setItem(SESSION_KEY, '1'); }catch(e){} }
-            return v;
-          }catch(e){
-            console.warn('[visitor counter] ' + p.name + ' failed:', e && (e.status || e.message || e));
-          }
+    // Hedged race: start the first provider; if it hasn't answered in 1.2s, start the next
+    // one in parallel. The first successful answer wins, so a slow service never blocks the counter.
+    function getLive(){
+      return new Promise(resolve=>{
+        let done = false, failed = 0, started = 0;
+        function finish(v){
+          if(done) return;
+          done = true;
+          if(v !== null && doHit){ try{ sessionStorage.setItem(SESSION_KEY, '1'); }catch(e){} }
+          resolve(v);
         }
-        if(attempt === 0) await sleep(1500);   // brief pause, then retry both once
-      }
-      return null;
+        function start(i){
+          if(i >= providers.length || done) return;
+          started++;
+          providers[i](doHit).then(finish).catch(e=>{
+            console.warn('[visitor counter] ' + providers[i].name + ' failed:', e && (e.status || e.message || e));
+            failed++;
+            if(i + 1 === started && !done) start(i + 1);   // failed fast: go to next immediately
+            if(failed >= providers.length) finish(null);
+          });
+          setTimeout(()=>{ if(!done && started === i + 1) start(i + 1); }, 1200);
+        }
+        start(0);
+      });
     }
 
     async function getBase(){
