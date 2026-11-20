@@ -364,6 +364,38 @@
 
   @media (max-width:860px){.tl-grid{grid-template-columns:1fr;}}
 
+  /* ---------- Hero: connect panel ---------- */
+  .connect{
+    margin-top:30px;background:var(--white);border:1px solid var(--mint-line);
+    border-radius:var(--radius-md);padding:16px 16px 16px;box-shadow:var(--shadow-sm);max-width:560px;
+  }
+  .connect-label{
+    display:flex;align-items:center;gap:12px;font-family:'IBM Plex Mono',monospace;
+    font-size:11.5px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-soft);
+  }
+  .connect-label::after{content:"";flex:1;height:1px;background:var(--mint-line);}
+  .connect-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px;}
+  .connect-btn{
+    display:flex;flex-direction:column;align-items:center;gap:9px;text-align:center;
+    padding:14px 6px 12px;border-radius:14px;background:var(--mint-bg);border:1px solid var(--mint-line);
+    transition:transform .2s ease, box-shadow .2s ease, border-color .2s ease, background .2s ease;
+  }
+  .connect-btn:hover{transform:translateY(-4px);background:var(--white);border-color:var(--teal-light);box-shadow:var(--shadow-md);}
+  .connect-btn .ci{
+    width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;
+    color:var(--white);box-shadow:0 6px 14px rgba(11,79,82,.18);
+  }
+  .connect-btn .ci svg{width:21px;height:21px;}
+  .connect-btn b{display:block;font-family:'Space Grotesk',sans-serif;font-size:13.5px;color:var(--ink);line-height:1.2;}
+  .connect-btn small{display:block;font-size:11.5px;color:var(--ink-soft);margin-top:2px;}
+  .ci-maps{background:linear-gradient(135deg,#34A853,#1E8E3E);}
+  .ci-gbp{background:linear-gradient(135deg,#4285F4,#1A5FD0);}
+  .ci-fb{background:linear-gradient(135deg,#1877F2,#0C5BC4);}
+  .ci-review{background:linear-gradient(135deg,#FFC94D,var(--amber));color:var(--ink) !important;}
+  .connect-btn.is-review{border-color:rgba(255,107,84,.45);background:#FFF6F3;}
+  .connect-btn.is-review:hover{border-color:var(--coral);background:var(--white);}
+  @media (max-width:520px){.connect-grid{grid-template-columns:repeat(2,1fr);}.connect{max-width:none;}}
+
   /* ---------- CTA banner ---------- */
   .cta-band{
     background:linear-gradient(120deg,var(--coral),var(--coral-dark));
@@ -391,6 +423,31 @@
   footer ul li a:hover{color:var(--white);}
   .foot-bottom{display:flex;justify-content:space-between;align-items:center;padding-top:22px;font-size:13px;flex-wrap:wrap;gap:10px;}
   .foot-bottom a{color:var(--teal-light);font-weight:600;}
+
+  /* ---------- Visitor counter ---------- */
+  .foot-counter{
+    display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap;
+    padding:26px 0;border-bottom:1px solid rgba(255,255,255,.1);
+  }
+  .vc{
+    display:inline-flex;align-items:center;gap:16px;padding:12px 18px;border-radius:16px;
+    background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);
+  }
+  .vc[hidden]{display:none;}
+  .vc-ico{width:38px;height:38px;border-radius:11px;background:rgba(95,194,184,.16);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .vc-ico svg{width:20px;height:20px;stroke:var(--teal-light);}
+  .vc-meta b{display:block;color:var(--white);font-family:'Space Grotesk',sans-serif;font-size:14px;}
+  .vc-meta small{color:rgba(255,255,255,.6);font-size:12px;}
+  .vc-digits{display:flex;gap:4px;}
+  .vc-digit{
+    position:relative;width:26px;height:38px;border-radius:7px;display:flex;align-items:center;justify-content:center;
+    font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:20px;color:var(--white);
+    background:linear-gradient(180deg,#0E6366 0%,var(--teal-deep) 50%,#083B3E 50%,#0A4549 100%);
+    border:1px solid rgba(255,255,255,.14);box-shadow:inset 0 -2px 0 rgba(0,0,0,.25);
+  }
+  .vc-digit.sep{width:10px;background:none;border:0;box-shadow:none;color:rgba(255,255,255,.5);}
+  .foot-counter p{font-size:13.5px;}
+  @media (max-width:560px){.vc{gap:12px;padding:10px 12px;}.vc-digit{width:22px;height:34px;font-size:17px;}}
 
   @media (max-width:760px){.foot-grid{grid-template-columns:1fr;gap:28px;}}
 
@@ -481,6 +538,27 @@
           <div class="hero-stat">
             <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.5 6.5L21 9l-5 4.5L17.5 21 12 17l-5.5 4L8 13.5 3 9l6.5-.5L12 2z"/></svg></div>
             <div><b>Consult ₹150</b><small>Straight to the point</small></div>
+          </div>
+        </div>
+        <div class="connect">
+          <div class="connect-label">Find us online</div>
+          <div class="connect-grid">
+            <a class="connect-btn" href="https://maps.app.goo.gl/Fb5EHjDcFgZA9WuXA" target="_blank" rel="noopener" aria-label="Open Dental Care Clinic in Google Maps">
+              <span class="ci ci-maps"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/></svg></span>
+              <span><b>Google Maps</b><small>Get directions</small></span>
+            </a>
+            <a class="connect-btn" href="https://g.page/r/CfAT6tt87UnPEAI" target="_blank" rel="noopener" aria-label="View our Google Business page">
+              <span class="ci ci-gbp"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l1.5-5h15L21 9"/><path d="M3 9c0 1.7 1.3 3 3 3s3-1.3 3-3c0 1.7 1.3 3 3 3s3-1.3 3-3c0 1.7 1.3 3 3 3s3-1.3 3-3"/><path d="M5 12v8h14v-8M9 20v-5h6v5"/></svg></span>
+              <span><b>Google Page</b><small>View profile</small></span>
+            </a>
+            <a class="connect-btn" href="https://www.facebook.com/profile.php?id=61593813294819" target="_blank" rel="noopener" aria-label="Follow us on Facebook">
+              <span class="ci ci-fb"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13.5 22v-8.2h2.8l.5-3.3h-3.3V8.4c0-.9.4-1.7 1.8-1.7h1.6V3.8s-1.4-.3-2.8-.3c-2.8 0-4.5 1.7-4.5 4.7v2.3H6.8v3.3h2.8V22h3.9z"/></svg></span>
+              <span><b>Facebook</b><small>Follow us</small></span>
+            </a>
+            <a class="connect-btn is-review" href="https://g.page/r/CfAT6tt87UnPEBM/review" target="_blank" rel="noopener" aria-label="Write a Google review">
+              <span class="ci ci-review"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.3 6.9.7-5.2 4.6 1.5 6.8L12 17l-6.1 3.4 1.5-6.8L2.2 9l6.9-.7L12 2z"/></svg></span>
+              <span><b>Rate Us</b><small>Write a review</small></span>
+            </a>
           </div>
         </div>
       </div>
@@ -779,6 +857,14 @@
         </ul>
       </div>
     </div>
+    <div class="foot-counter">
+      <div class="vc" id="visitorCounter" hidden>
+        <div class="vc-ico"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></div>
+        <div class="vc-meta"><b>Total Visitors</b><small>Since we went online</small></div>
+        <div class="vc-digits" id="vcDigits" role="img" aria-label="Total visitors"></div>
+      </div>
+      <p>Thank you for visiting. We look forward to seeing you at the clinic.</p>
+    </div>
     <div class="foot-bottom">
       <span>© 2026 Dental Care Clinic, Rourkela. All rights reserved.</span>
       <span>Crafted by <a href="https://devsoftt.in">DevSoftt Developers</a></span>
@@ -865,6 +951,60 @@
       requestAnimationFrame(step);
     }
     requestAnimationFrame(step);
+  })();
+
+  // Visitor counter: reads/increments visitor-count.txt through visitor-counter.php.
+  // Falls back to reading visitor-count.txt directly; stays hidden if neither is reachable.
+  (function(){
+    const box = document.getElementById('visitorCounter');
+    const digitsEl = document.getElementById('vcDigits');
+    if(!box || !digitsEl) return;
+
+    let counted = false;
+    try{ counted = sessionStorage.getItem('dcc_visit_counted') === '1'; }catch(e){}
+
+    async function getCount(){
+      try{
+        const r = await fetch('visitor-counter.php' + (counted ? '' : '?hit=1'), {cache:'no-store'});
+        if(!r.ok) throw new Error('php');
+        const j = await r.json();
+        if(typeof j.count !== 'number') throw new Error('bad');
+        if(!counted){ try{ sessionStorage.setItem('dcc_visit_counted','1'); }catch(e){} }
+        return j.count;
+      }catch(e){}
+      try{
+        const r = await fetch('visitor-count.txt?v=' + Date.now(), {cache:'no-store'});
+        if(!r.ok) throw new Error('txt');
+        const n = parseInt((await r.text()).trim(), 10);
+        if(Number.isFinite(n) && n >= 0) return n;
+      }catch(e){}
+      return null;
+    }
+
+    function render(n){
+      const str = String(n).padStart(6, '0');
+      digitsEl.innerHTML = '';
+      for(let i = 0; i < str.length; i++){
+        const d = document.createElement('span');
+        d.className = 'vc-digit';
+        d.textContent = str[i];
+        digitsEl.appendChild(d);
+      }
+      digitsEl.setAttribute('aria-label', 'Total visitors: ' + n.toLocaleString('en-IN'));
+    }
+
+    getCount().then(n=>{
+      if(n === null) return;
+      box.hidden = false;
+      const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if(reduce || n < 2){ render(n); return; }
+      const start = performance.now(), dur = 1100;
+      (function tick(t){
+        const p = Math.min(1, (t - start) / dur);
+        render(Math.round(n * (1 - Math.pow(1 - p, 3))));
+        if(p < 1) requestAnimationFrame(tick);
+      })(start);
+    });
   })();
 </script>
 
