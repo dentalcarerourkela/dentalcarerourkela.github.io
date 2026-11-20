@@ -1000,13 +1000,20 @@
       }
     ];
 
+    const sleep = ms => new Promise(r=>setTimeout(r, ms));
+
     async function getLive(){
-      for(const p of providers){
-        try{
-          const v = await p(doHit);
-          if(doHit){ try{ sessionStorage.setItem(SESSION_KEY, '1'); }catch(e){} }
-          return v;
-        }catch(e){ /* try next provider */ }
+      for(let attempt = 0; attempt < 2; attempt++){
+        for(const p of providers){
+          try{
+            const v = await p(doHit);
+            if(doHit){ try{ sessionStorage.setItem(SESSION_KEY, '1'); }catch(e){} }
+            return v;
+          }catch(e){
+            console.warn('[visitor counter] ' + p.name + ' failed:', e && (e.status || e.message || e));
+          }
+        }
+        if(attempt === 0) await sleep(1500);   // brief pause, then retry both once
       }
       return null;
     }
@@ -1038,7 +1045,7 @@
     render(cached > 0 ? cached : null);
 
     Promise.all([getBase(), getLive()]).then(([base, live])=>{
-      if(live === null){ if(cached > 0) render(cached); return; }
+      if(live === null){ const fb = Math.max(base, cached); if(fb > 0) render(fb); return; }
       const total = Math.max(base + live, cached);   // never show a lower number than before
       try{ localStorage.setItem(CACHE_KEY, String(total)); }catch(e){}
       render(total);
