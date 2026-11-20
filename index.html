@@ -859,7 +859,7 @@
       </div>
     </div>
     <div class="foot-counter">
-      <div class="vc" id="visitorCounter" hidden>
+      <div class="vc" id="visitorCounter">
         <div class="vc-ico"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></div>
         <div class="vc-meta"><b>Total Visitors</b><small>Since we went online</small></div>
         <div class="vc-digits" id="vcDigits" role="img" aria-label="Total visitors"></div>
@@ -954,22 +954,62 @@
     requestAnimationFrame(step);
   })();
 
-  // Visitor counter (works on static hosting such as GitHub Pages).
-  // Live visits come from the free Abacus counter API; visitor-count.txt holds the starting number
-  // (default 0) that is added on top. If the API is unreachable, the page falls back to the number in
-  // visitor-count.txt, and stays hidden if that is 0 or missing.
+  // Visitor counter — always visible, counts once per browser session,
+  // tries Abacus first then CounterAPI, and falls back to the last known total.
   (function(){
     const box = document.getElementById('visitorCounter');
     const digitsEl = document.getElementById('vcDigits');
     if(!box || !digitsEl) return;
 
-    const NAMESPACE = 'dentalcarerourkela-github-io';   // change only if you want a fresh count
+    const NS = 'dentalcarerourkela-github-io';
     const KEY = 'visits';
-    const API = 'https://abacus.jasoncameron.dev';
+    const SESSION_KEY = 'dcc_visit_counted';
+    const CACHE_KEY = 'dcc_visit_total';
 
     let counted = false;
-    try{ counted = sessionStorage.getItem('dcc_visit_counted') === '1'; }catch(e){}
-    const isBot = navigator.webdriver || /bot|crawl|spider|slurp|preview|headless/i.test(navigator.userAgent);
+    try{ counted = sessionStorage.getItem(SESSION_KEY) === '1'; }catch(e){}
+    const isBot = /bot|crawl|spider|slurp|preview|headless|lighthouse/i.test(navigator.userAgent);
+    const doHit = !counted && !isBot;
+
+    function fetchJSON(url, ms){
+      const ctl = new AbortController();
+      const t = setTimeout(()=>ctl.abort(), ms);
+      return fetch(url, {cache:'no-store', signal: ctl.signal}).then(r=>{
+        clearTimeout(t);
+        if(!r.ok){ const e = new Error('http ' + r.status); e.status = r.status; throw e; }
+        return r.json();
+      }).catch(e=>{ clearTimeout(t); throw e; });
+    }
+
+    const providers = [
+      async function abacus(hit){
+        try{
+          const j = await fetchJSON('https://abacus.jasoncameron.dev/' + (hit ? 'hit' : 'get') + '/' + NS + '/' + KEY, 8000);
+          if(typeof j.value !== 'number') throw new Error('bad');
+          return j.value;
+        }catch(e){
+          if(e.status === 404 && !hit) return 0;   // key not created yet
+          throw e;
+        }
+      },
+      async function counterapi(hit){
+        const j = await fetchJSON('https://api.counterapi.dev/v1/' + NS + '/' + KEY + (hit ? '/up' : ''), 8000);
+        const n = j.count !== undefined ? j.count : j.value;
+        if(typeof n !== 'number') throw new Error('bad');
+        return n;
+      }
+    ];
+
+    async function getLive(){
+      for(const p of providers){
+        try{
+          const v = await p(doHit);
+          if(doHit){ try{ sessionStorage.setItem(SESSION_KEY, '1'); }catch(e){} }
+          return v;
+        }catch(e){ /* try next provider */ }
+      }
+      return null;
+    }
 
     async function getBase(){
       try{
@@ -980,53 +1020,28 @@
       }catch(e){ return 0; }
     }
 
-    async function getLive(){
-      const mode = (counted || isBot) ? 'get' : 'hit';   // count each visitor once per browser session
-      try{
-        const ctl = new AbortController();
-        const t = setTimeout(()=>ctl.abort(), 6000);
-        const r = await fetch(API + '/' + mode + '/' + NAMESPACE + '/' + KEY, {cache:'no-store', signal: ctl.signal});
-        clearTimeout(t);
-        if(r.status === 404 && mode === 'get') return 0;   // nobody counted yet
-        if(!r.ok) throw new Error('api');
-        const j = await r.json();
-        if(typeof j.value !== 'number') throw new Error('bad');
-        if(mode === 'hit'){ try{ sessionStorage.setItem('dcc_visit_counted','1'); }catch(e){} }
-        return j.value;
-      }catch(e){ return null; }
-    }
-
     function render(n){
-      const str = String(n).padStart(6, '0');
+      const str = (n === null) ? '------' : String(n).padStart(6, '0');
       digitsEl.innerHTML = '';
-      for(let i = 0; i < str.length; i++){
+      for(const ch of str){
         const d = document.createElement('span');
         d.className = 'vc-digit';
-        d.textContent = str[i];
+        d.textContent = ch;
         digitsEl.appendChild(d);
       }
-      digitsEl.setAttribute('aria-label', 'Total visitors: ' + n.toLocaleString('en-IN'));
+      digitsEl.setAttribute('aria-label', n === null ? 'Total visitors unavailable' : 'Total visitors: ' + n.toLocaleString('en-IN'));
     }
 
-    // Show the last known total immediately (no waiting on the network), then refresh it quietly.
+    // Show last known total instantly (or dashes), then refresh.
     let cached = 0;
-    try{ cached = parseInt(localStorage.getItem('dcc_visit_total'), 10) || 0; }catch(e){}
-    if(cached > 0){ render(cached); box.hidden = false; }
+    try{ cached = parseInt(localStorage.getItem(CACHE_KEY), 10) || 0; }catch(e){}
+    render(cached > 0 ? cached : null);
 
     Promise.all([getBase(), getLive()]).then(([base, live])=>{
-      const total = live === null ? base : base + live;
-      if(total <= 0) return;                 // nothing real to show: keep the counter hidden
-      try{ localStorage.setItem('dcc_visit_total', String(total)); }catch(e){}
-      if(cached > 0){ render(total); return; }   // already visible: just update the digits
-      box.hidden = false;
-      const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      if(reduce || total < 2){ render(total); return; }
-      const start = performance.now(), dur = 600;   // short count-up, first-ever visit only
-      (function tick(t){
-        const p = Math.min(1, (t - start) / dur);
-        render(Math.round(total * (1 - Math.pow(1 - p, 3))));
-        if(p < 1) requestAnimationFrame(tick);
-      })(start);
+      if(live === null){ if(cached > 0) render(cached); return; }
+      const total = Math.max(base + live, cached);   // never show a lower number than before
+      try{ localStorage.setItem(CACHE_KEY, String(total)); }catch(e){}
+      render(total);
     });
   })();
 </script>
