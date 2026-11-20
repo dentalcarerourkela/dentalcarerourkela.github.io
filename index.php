@@ -1,3 +1,48 @@
+<?php
+/**
+ * Server-side visitor counter — stored in a file on the server, so the total is
+ * shared by all visitors and browsers and never depends on third-party services.
+ * Each visitor is counted once per 12 hours (cookie); bots and previews are skipped.
+ */
+$counterFile = __DIR__ . '/assets/data/visitor_count.txt';
+$startCount  = 0; // starting number (change if you want the counter to begin higher)
+
+$counterDir = dirname($counterFile);
+if (!is_dir($counterDir)) {
+    @mkdir($counterDir, 0755, true);
+}
+
+$ua    = $_SERVER['HTTP_USER_AGENT'] ?? '';
+$isBot = (bool) preg_match('/bot|crawl|spider|slurp|preview|headless|lighthouse|facebookexternalhit/i', $ua);
+$alreadyCounted = isset($_COOKIE['dcc_visited']);
+$shouldCount = !$isBot && !$alreadyCounted && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET';
+
+$visitorCount = $startCount;
+$fp = @fopen($counterFile, 'c+');
+if ($fp) {
+    if (flock($fp, LOCK_EX)) {
+        $contents = trim(stream_get_contents($fp));
+        $current  = ($contents !== '' && is_numeric($contents)) ? (int) $contents : $startCount;
+        $visitorCount = $shouldCount ? $current + 1 : $current;
+
+        if ($shouldCount) {
+            ftruncate($fp, 0);
+            rewind($fp);
+            fwrite($fp, (string) $visitorCount);
+            fflush($fp);
+        }
+        flock($fp, LOCK_UN);
+    } else {
+        $contents = trim(stream_get_contents($fp));
+        $visitorCount = ($contents !== '' && is_numeric($contents)) ? (int) $contents : $startCount;
+    }
+    fclose($fp);
+}
+if ($shouldCount && !headers_sent()) {
+    setcookie('dcc_visited', '1', ['expires' => time() + 43200, 'path' => '/', 'samesite' => 'Lax']);
+}
+$visitorDigits = str_split(str_pad((string) $visitorCount, 6, '0', STR_PAD_LEFT));
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11,8 +56,6 @@
 <meta name="twitter:card" content="summary">
 <meta name="theme-color" content="#0B4F52">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 110'%3E%3Cpath fill='%230E7A78' d='M50 8c-14 0-24 9-24 25 0 13 5 19 7 34 1.5 10 4 24 10.5 24s7.5-13 8.5-20c.5-3 2.5-3 3 0 1 7 2 20 8.5 20S71 80 72.5 67c2-15 7-21 7-34C79.5 17 69.5 8 55.5 8'/%3E%3C/svg%3E">
-<link rel="preconnect" href="https://abacus.jasoncameron.dev" crossorigin>
-<link rel="preconnect" href="https://api.counterapi.dev" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
@@ -863,7 +906,7 @@
       <div class="vc" id="visitorCounter">
         <div class="vc-ico"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></div>
         <div class="vc-meta"><b>Total Visitors</b><small>Since we went online</small></div>
-        <div class="vc-digits" id="vcDigits" role="img" aria-label="Total visitors"></div>
+        <div class="vc-digits" id="vcDigits" role="img" aria-label="Total visitors: <?php echo number_format($visitorCount); ?>"><?php foreach ($visitorDigits as $d) { echo '<span class="vc-digit">' . $d . '</span>'; } ?></div>
       </div>
       <p>Thank you for visiting. We look forward to seeing you at the clinic.</p>
     </div>
@@ -953,112 +996,6 @@
       requestAnimationFrame(step);
     }
     requestAnimationFrame(step);
-  })();
-
-  // Visitor counter — always visible, counts once per browser session,
-  // tries Abacus first then CounterAPI, and falls back to the last known total.
-  (function(){
-    const box = document.getElementById('visitorCounter');
-    const digitsEl = document.getElementById('vcDigits');
-    if(!box || !digitsEl) return;
-
-    const NS = 'dentalcarerourkela-github-io';
-    const KEY = 'visits';
-    const SESSION_KEY = 'dcc_visit_counted';
-    const CACHE_KEY = 'dcc_visit_total';
-
-    let counted = false;
-    try{ counted = sessionStorage.getItem(SESSION_KEY) === '1'; }catch(e){}
-    const isBot = /bot|crawl|spider|slurp|preview|headless|lighthouse/i.test(navigator.userAgent);
-    const doHit = !counted && !isBot;
-
-    function fetchJSON(url, ms){
-      const ctl = new AbortController();
-      const t = setTimeout(()=>ctl.abort(), ms);
-      return fetch(url, {cache:'no-store', signal: ctl.signal}).then(r=>{
-        clearTimeout(t);
-        if(!r.ok){ const e = new Error('http ' + r.status); e.status = r.status; throw e; }
-        return r.json();
-      }).catch(e=>{ clearTimeout(t); throw e; });
-    }
-
-    const providers = [
-      async function abacus(hit){
-        try{
-          const j = await fetchJSON('https://abacus.jasoncameron.dev/' + (hit ? 'hit' : 'get') + '/' + NS + '/' + KEY, 4000);
-          if(typeof j.value !== 'number') throw new Error('bad');
-          return j.value;
-        }catch(e){
-          if(e.status === 404 && !hit) return 0;   // key not created yet
-          throw e;
-        }
-      },
-      async function counterapi(hit){
-        const j = await fetchJSON('https://api.counterapi.dev/v1/' + NS + '/' + KEY + (hit ? '/up' : ''), 4000);
-        const n = j.count !== undefined ? j.count : j.value;
-        if(typeof n !== 'number') throw new Error('bad');
-        return n;
-      }
-    ];
-
-    // Hedged race: start the first provider; if it hasn't answered in 1.2s, start the next
-    // one in parallel. The first successful answer wins, so a slow service never blocks the counter.
-    function getLive(){
-      return new Promise(resolve=>{
-        let done = false, failed = 0, started = 0;
-        function finish(v){
-          if(done) return;
-          done = true;
-          if(v !== null && doHit){ try{ sessionStorage.setItem(SESSION_KEY, '1'); }catch(e){} }
-          resolve(v);
-        }
-        function start(i){
-          if(i >= providers.length || done) return;
-          started++;
-          providers[i](doHit).then(finish).catch(e=>{
-            console.warn('[visitor counter] ' + providers[i].name + ' failed:', e && (e.status || e.message || e));
-            failed++;
-            if(i + 1 === started && !done) start(i + 1);   // failed fast: go to next immediately
-            if(failed >= providers.length) finish(null);
-          });
-          setTimeout(()=>{ if(!done && started === i + 1) start(i + 1); }, 1200);
-        }
-        start(0);
-      });
-    }
-
-    async function getBase(){
-      try{
-        const r = await fetch('visitor-count.txt?v=' + Date.now(), {cache:'no-store'});
-        if(!r.ok) return 0;
-        const n = parseInt((await r.text()).trim(), 10);
-        return Number.isFinite(n) && n >= 0 ? n : 0;
-      }catch(e){ return 0; }
-    }
-
-    function render(n){
-      const str = (n === null) ? '------' : String(n).padStart(6, '0');
-      digitsEl.innerHTML = '';
-      for(const ch of str){
-        const d = document.createElement('span');
-        d.className = 'vc-digit';
-        d.textContent = ch;
-        digitsEl.appendChild(d);
-      }
-      digitsEl.setAttribute('aria-label', n === null ? 'Total visitors unavailable' : 'Total visitors: ' + n.toLocaleString('en-IN'));
-    }
-
-    // Show last known total instantly (or dashes), then refresh.
-    let cached = 0;
-    try{ cached = parseInt(localStorage.getItem(CACHE_KEY), 10) || 0; }catch(e){}
-    render(cached > 0 ? cached : null);
-
-    Promise.all([getBase(), getLive()]).then(([base, live])=>{
-      if(live === null){ const fb = Math.max(base, cached); if(fb > 0) render(fb); return; }
-      const total = Math.max(base + live, cached);   // never show a lower number than before
-      try{ localStorage.setItem(CACHE_KEY, String(total)); }catch(e){}
-      render(total);
-    });
   })();
 </script>
 
