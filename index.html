@@ -1,48 +1,3 @@
-<?php
-/**
- * Server-side visitor counter — stored in a file on the server, so the total is
- * shared by all visitors and browsers and never depends on third-party services.
- * Each visitor is counted once per 12 hours (cookie); bots and previews are skipped.
- */
-$counterFile = __DIR__ . '/assets/data/visitor_count.txt';
-$startCount  = 0; // starting number (change if you want the counter to begin higher)
-
-$counterDir = dirname($counterFile);
-if (!is_dir($counterDir)) {
-    @mkdir($counterDir, 0755, true);
-}
-
-$ua    = $_SERVER['HTTP_USER_AGENT'] ?? '';
-$isBot = (bool) preg_match('/bot|crawl|spider|slurp|preview|headless|lighthouse|facebookexternalhit/i', $ua);
-$alreadyCounted = isset($_COOKIE['dcc_visited']);
-$shouldCount = !$isBot && !$alreadyCounted && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET';
-
-$visitorCount = $startCount;
-$fp = @fopen($counterFile, 'c+');
-if ($fp) {
-    if (flock($fp, LOCK_EX)) {
-        $contents = trim(stream_get_contents($fp));
-        $current  = ($contents !== '' && is_numeric($contents)) ? (int) $contents : $startCount;
-        $visitorCount = $shouldCount ? $current + 1 : $current;
-
-        if ($shouldCount) {
-            ftruncate($fp, 0);
-            rewind($fp);
-            fwrite($fp, (string) $visitorCount);
-            fflush($fp);
-        }
-        flock($fp, LOCK_UN);
-    } else {
-        $contents = trim(stream_get_contents($fp));
-        $visitorCount = ($contents !== '' && is_numeric($contents)) ? (int) $contents : $startCount;
-    }
-    fclose($fp);
-}
-if ($shouldCount && !headers_sent()) {
-    setcookie('dcc_visited', '1', ['expires' => time() + 43200, 'path' => '/', 'samesite' => 'Lax']);
-}
-$visitorDigits = str_split(str_pad((string) $visitorCount, 6, '0', STR_PAD_LEFT));
-?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -903,10 +858,10 @@ $visitorDigits = str_split(str_pad((string) $visitorCount, 6, '0', STR_PAD_LEFT)
       </div>
     </div>
     <div class="foot-counter">
-      <div class="vc" id="visitorCounter">
+      <div class="vc" id="visitorCounter" hidden>
         <div class="vc-ico"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></div>
         <div class="vc-meta"><b>Total Visitors</b><small>Since we went online</small></div>
-        <div class="vc-digits" id="vcDigits" role="img" aria-label="Total visitors: <?php echo number_format($visitorCount); ?>"><?php foreach ($visitorDigits as $d) { echo '<span class="vc-digit">' . $d . '</span>'; } ?></div>
+        <div class="vc-digits" id="vcDigits" role="img" aria-label="Total visitors"></div>
       </div>
       <p>Thank you for visiting. We look forward to seeing you at the clinic.</p>
     </div>
@@ -996,6 +951,75 @@ $visitorDigits = str_split(str_pad((string) $visitorCount, 6, '0', STR_PAD_LEFT)
       requestAnimationFrame(step);
     }
     requestAnimationFrame(step);
+  })();
+
+  // Visitor counter (works on static hosting such as GitHub Pages).
+  // Live visits come from the free Abacus counter API; visitor-count.txt holds the starting number
+  // (default 0) that is added on top. If the API is unreachable, the page falls back to the number in
+  // visitor-count.txt, and stays hidden if that is 0 or missing.
+  (function(){
+    const box = document.getElementById('visitorCounter');
+    const digitsEl = document.getElementById('vcDigits');
+    if(!box || !digitsEl) return;
+
+    const NAMESPACE = 'dentalcarerourkela-github-io';   // change only if you want a fresh count
+    const KEY = 'visits';
+    const API = 'https://abacus.jasoncameron.dev';
+
+    let counted = false;
+    try{ counted = sessionStorage.getItem('dcc_visit_counted') === '1'; }catch(e){}
+    const isBot = navigator.webdriver || /bot|crawl|spider|slurp|preview|headless/i.test(navigator.userAgent);
+
+    async function getBase(){
+      try{
+        const r = await fetch('visitor-count.txt?v=' + Date.now(), {cache:'no-store'});
+        if(!r.ok) return 0;
+        const n = parseInt((await r.text()).trim(), 10);
+        return Number.isFinite(n) && n >= 0 ? n : 0;
+      }catch(e){ return 0; }
+    }
+
+    async function getLive(){
+      const mode = (counted || isBot) ? 'get' : 'hit';   // count each visitor once per browser session
+      try{
+        const ctl = new AbortController();
+        const t = setTimeout(()=>ctl.abort(), 6000);
+        const r = await fetch(API + '/' + mode + '/' + NAMESPACE + '/' + KEY, {cache:'no-store', signal: ctl.signal});
+        clearTimeout(t);
+        if(r.status === 404 && mode === 'get') return 0;   // nobody counted yet
+        if(!r.ok) throw new Error('api');
+        const j = await r.json();
+        if(typeof j.value !== 'number') throw new Error('bad');
+        if(mode === 'hit'){ try{ sessionStorage.setItem('dcc_visit_counted','1'); }catch(e){} }
+        return j.value;
+      }catch(e){ return null; }
+    }
+
+    function render(n){
+      const str = String(n).padStart(6, '0');
+      digitsEl.innerHTML = '';
+      for(let i = 0; i < str.length; i++){
+        const d = document.createElement('span');
+        d.className = 'vc-digit';
+        d.textContent = str[i];
+        digitsEl.appendChild(d);
+      }
+      digitsEl.setAttribute('aria-label', 'Total visitors: ' + n.toLocaleString('en-IN'));
+    }
+
+    Promise.all([getBase(), getLive()]).then(([base, live])=>{
+      const total = live === null ? base : base + live;
+      if(total <= 0) return;                 // nothing real to show: keep the counter hidden
+      box.hidden = false;
+      const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if(reduce || total < 2){ render(total); return; }
+      const start = performance.now(), dur = 1100;
+      (function tick(t){
+        const p = Math.min(1, (t - start) / dur);
+        render(Math.round(total * (1 - Math.pow(1 - p, 3))));
+        if(p < 1) requestAnimationFrame(tick);
+      })(start);
+    });
   })();
 </script>
 
