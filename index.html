@@ -953,32 +953,46 @@
     requestAnimationFrame(step);
   })();
 
-  // Visitor counter: reads/increments visitor-count.txt through visitor-counter.php.
-  // Falls back to reading visitor-count.txt directly; stays hidden if neither is reachable.
+  // Visitor counter (works on static hosting such as GitHub Pages).
+  // Live visits come from the free Abacus counter API; visitor-count.txt holds the starting number
+  // (default 0) that is added on top. If the API is unreachable, the page falls back to the number in
+  // visitor-count.txt, and stays hidden if that is 0 or missing.
   (function(){
     const box = document.getElementById('visitorCounter');
     const digitsEl = document.getElementById('vcDigits');
     if(!box || !digitsEl) return;
 
+    const NAMESPACE = 'dentalcarerourkela-github-io';   // change only if you want a fresh count
+    const KEY = 'visits';
+    const API = 'https://abacus.jasoncameron.dev';
+
     let counted = false;
     try{ counted = sessionStorage.getItem('dcc_visit_counted') === '1'; }catch(e){}
+    const isBot = navigator.webdriver || /bot|crawl|spider|slurp|preview|headless/i.test(navigator.userAgent);
 
-    async function getCount(){
-      try{
-        const r = await fetch('visitor-counter.php' + (counted ? '' : '?hit=1'), {cache:'no-store'});
-        if(!r.ok) throw new Error('php');
-        const j = await r.json();
-        if(typeof j.count !== 'number') throw new Error('bad');
-        if(!counted){ try{ sessionStorage.setItem('dcc_visit_counted','1'); }catch(e){} }
-        return j.count;
-      }catch(e){}
+    async function getBase(){
       try{
         const r = await fetch('visitor-count.txt?v=' + Date.now(), {cache:'no-store'});
-        if(!r.ok) throw new Error('txt');
+        if(!r.ok) return 0;
         const n = parseInt((await r.text()).trim(), 10);
-        if(Number.isFinite(n) && n >= 0) return n;
-      }catch(e){}
-      return null;
+        return Number.isFinite(n) && n >= 0 ? n : 0;
+      }catch(e){ return 0; }
+    }
+
+    async function getLive(){
+      const mode = (counted || isBot) ? 'get' : 'hit';   // count each visitor once per browser session
+      try{
+        const ctl = new AbortController();
+        const t = setTimeout(()=>ctl.abort(), 6000);
+        const r = await fetch(API + '/' + mode + '/' + NAMESPACE + '/' + KEY, {cache:'no-store', signal: ctl.signal});
+        clearTimeout(t);
+        if(r.status === 404 && mode === 'get') return 0;   // nobody counted yet
+        if(!r.ok) throw new Error('api');
+        const j = await r.json();
+        if(typeof j.value !== 'number') throw new Error('bad');
+        if(mode === 'hit'){ try{ sessionStorage.setItem('dcc_visit_counted','1'); }catch(e){} }
+        return j.value;
+      }catch(e){ return null; }
     }
 
     function render(n){
@@ -993,15 +1007,16 @@
       digitsEl.setAttribute('aria-label', 'Total visitors: ' + n.toLocaleString('en-IN'));
     }
 
-    getCount().then(n=>{
-      if(n === null) return;
+    Promise.all([getBase(), getLive()]).then(([base, live])=>{
+      const total = live === null ? base : base + live;
+      if(total <= 0) return;                 // nothing real to show: keep the counter hidden
       box.hidden = false;
       const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      if(reduce || n < 2){ render(n); return; }
+      if(reduce || total < 2){ render(total); return; }
       const start = performance.now(), dur = 1100;
       (function tick(t){
         const p = Math.min(1, (t - start) / dur);
-        render(Math.round(n * (1 - Math.pow(1 - p, 3))));
+        render(Math.round(total * (1 - Math.pow(1 - p, 3))));
         if(p < 1) requestAnimationFrame(tick);
       })(start);
     });
