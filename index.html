@@ -953,14 +953,11 @@
     requestAnimationFrame(step);
   })();
 
-  // Visitor counter (static-site version, works on GitHub Pages).
-  // Tries several free counter services in order until one answers.
-  // Each browser is counted once per 12 hours; the last total is cached locally.
+  // Visitor counter — talks to your own Google Apps Script web app (see counter-backend.gs).
+  // Paste the Web app URL (ends in /exec) below. Each browser is counted once per 12 hours.
   (function(){
-    var NAMESPACE = 'dentalcareclinic-rourkela-769001';  // unique name for this site's counter
-    var KEY       = 'visitors';
-    var START     = 0;                                   // added to the total to start higher
-    var TTL       = 12 * 60 * 60 * 1000;
+    var COUNTER_URL = 'PASTE_YOUR_WEB_APP_URL_HERE';
+    var TTL = 12 * 60 * 60 * 1000;
     var box  = document.getElementById('vcDigits');
     var wrap = document.getElementById('visitorCounter');
     if(!box) return;
@@ -976,64 +973,29 @@
     var cached = parseInt(load('dcc_count'), 10);
     if(!isNaN(cached)) render(cached);
 
-    var ua = navigator.userAgent || '';
-    var isBot = /bot|crawl|spider|slurp|preview|headless|lighthouse|facebookexternalhit/i.test(ua);
+    if(!/^https:\/\/script\.google(usercontent)?\.com\//.test(COUNTER_URL)){
+      if(isNaN(cached) && wrap) wrap.hidden = true;   // not configured yet
+      return;
+    }
+
+    var isBot = /bot|crawl|spider|slurp|preview|headless|lighthouse|facebookexternalhit/i.test(navigator.userAgent || '');
     var last = parseInt(load('dcc_visited_at'), 10);
     var shouldCount = !isBot && !(!isNaN(last) && (Date.now() - last) < TTL);
 
-    // Each provider: build a URL for "count this visit" or "just read", and pull the number out.
-    var providers = [
-      { // Abacus
-        hit:  'https://abacus.jasoncameron.dev/hit/'  + NAMESPACE + '/' + KEY,
-        get:  'https://abacus.jasoncameron.dev/get/'  + NAMESPACE + '/' + KEY,
-        read: function(d){ return d.value; }
-      },
-      { // counterapi.dev
-        hit:  'https://api.counterapi.dev/v1/' + NAMESPACE + '/' + KEY + '/up',
-        get:  'https://api.counterapi.dev/v1/' + NAMESPACE + '/' + KEY,
-        read: function(d){ return d.count; }
-      },
-      { // CountAPI mirror
-        hit:  'https://api.countapi.xyz/hit/' + NAMESPACE + '/' + KEY,
-        get:  'https://api.countapi.xyz/get/' + NAMESPACE + '/' + KEY,
-        read: function(d){ return d.value; }
-      }
-    ];
+    var url = COUNTER_URL + (COUNTER_URL.indexOf('?') > -1 ? '&' : '?') + 'hit=' + (shouldCount ? '1' : '0') + '&t=' + Date.now();
 
-    function timeoutFetch(url, ms){
-      var ctrl = ('AbortController' in window) ? new AbortController() : null;
-      var t = ctrl ? setTimeout(function(){ ctrl.abort(); }, ms) : null;
-      return fetch(url, {cache:'no-store', signal: ctrl ? ctrl.signal : undefined})
-        .then(function(r){ if(t) clearTimeout(t); return r; }, function(err){ if(t) clearTimeout(t); throw err; });
-    }
-
-    function tryProvider(i){
-      if(i >= providers.length) return Promise.reject(new Error('all failed'));
-      var p = providers[i];
-      return timeoutFetch(shouldCount ? p.hit : p.get, 6000)
-        .then(function(r){
-          if(r.status === 404 && !shouldCount) return {};   // counter not created yet = 0 so far
-          if(!r.ok) throw new Error('http ' + r.status);
-          return r.json();
-        })
-        .then(function(d){
-          var n = parseInt(p.read(d), 10);
-          if(isNaN(n)) n = 0;
-          return n;
-        })
-        .catch(function(){ return tryProvider(i + 1); });
-    }
-
-    tryProvider(0).then(function(n){
-      n += START;
-      // Never let the display go backwards if a provider was reset
-      if(!isNaN(cached) && n < cached && !shouldCount) n = cached;
-      render(n);
-      store('dcc_count', n);
-      if(shouldCount) store('dcc_visited_at', Date.now());
-    }).catch(function(){
-      if(isNaN(cached) && wrap) wrap.hidden = true;
-    });
+    fetch(url, {cache:'no-store'})
+      .then(function(r){ if(!r.ok) throw new Error('http ' + r.status); return r.json(); })
+      .then(function(d){
+        var n = parseInt(d.count, 10);
+        if(isNaN(n)) throw new Error('bad response');
+        render(n);
+        store('dcc_count', n);
+        if(shouldCount) store('dcc_visited_at', Date.now());
+      })
+      .catch(function(){
+        if(isNaN(cached) && wrap) wrap.hidden = true;
+      });
   })();
 </script>
 
