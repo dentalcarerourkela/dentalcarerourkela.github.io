@@ -858,10 +858,10 @@
       </div>
     </div>
     <div class="foot-counter">
-      <div class="vc" id="visitorCounter" hidden>
+      <div class="vc" id="visitorCounter">
         <div class="vc-ico"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></div>
         <div class="vc-meta"><b>Total Visitors</b><small>Since we went online</small></div>
-        <div class="vc-digits" id="vcDigits" role="img" aria-label="Total visitors"></div>
+        <div class="vc-digits" id="vcDigits" role="img" aria-label="Total visitors"><span class="vc-digit">0</span><span class="vc-digit">0</span><span class="vc-digit">0</span><span class="vc-digit">0</span><span class="vc-digit">0</span><span class="vc-digit">0</span></div>
       </div>
       <p>Thank you for visiting. We look forward to seeing you at the clinic.</p>
     </div>
@@ -953,73 +953,51 @@
     requestAnimationFrame(step);
   })();
 
-  // Visitor counter (works on static hosting such as GitHub Pages).
-  // Live visits come from the free Abacus counter API; visitor-count.txt holds the starting number
-  // (default 0) that is added on top. If the API is unreachable, the page falls back to the number in
-  // visitor-count.txt, and stays hidden if that is 0 or missing.
+  // Visitor counter (static-site version, works on GitHub Pages).
+  // Uses the free counterapi.dev service. Each browser is counted once per 12 hours
+  // (localStorage); the last known total is cached so the number always shows.
   (function(){
-    const box = document.getElementById('visitorCounter');
-    const digitsEl = document.getElementById('vcDigits');
-    if(!box || !digitsEl) return;
-
-    const NAMESPACE = 'dentalcarerourkela-github-io';   // change only if you want a fresh count
-    const KEY = 'visits';
-    const API = 'https://abacus.jasoncameron.dev';
-
-    let counted = false;
-    try{ counted = sessionStorage.getItem('dcc_visit_counted') === '1'; }catch(e){}
-    const isBot = navigator.webdriver || /bot|crawl|spider|slurp|preview|headless/i.test(navigator.userAgent);
-
-    async function getBase(){
-      try{
-        const r = await fetch('visitor-count.txt?v=' + Date.now(), {cache:'no-store'});
-        if(!r.ok) return 0;
-        const n = parseInt((await r.text()).trim(), 10);
-        return Number.isFinite(n) && n >= 0 ? n : 0;
-      }catch(e){ return 0; }
-    }
-
-    async function getLive(){
-      const mode = (counted || isBot) ? 'get' : 'hit';   // count each visitor once per browser session
-      try{
-        const ctl = new AbortController();
-        const t = setTimeout(()=>ctl.abort(), 6000);
-        const r = await fetch(API + '/' + mode + '/' + NAMESPACE + '/' + KEY, {cache:'no-store', signal: ctl.signal});
-        clearTimeout(t);
-        if(r.status === 404 && mode === 'get') return 0;   // nobody counted yet
-        if(!r.ok) throw new Error('api');
-        const j = await r.json();
-        if(typeof j.value !== 'number') throw new Error('bad');
-        if(mode === 'hit'){ try{ sessionStorage.setItem('dcc_visit_counted','1'); }catch(e){} }
-        return j.value;
-      }catch(e){ return null; }
-    }
+    var NAMESPACE = 'dentalcareclinic-rourkela';   // change for a fresh counter
+    var KEY       = 'visitors';
+    var START     = 0;                              // added to the API total to start higher
+    var TTL       = 12 * 60 * 60 * 1000;
+    var box = document.getElementById('vcDigits');
+    var wrap = document.getElementById('visitorCounter');
+    if(!box) return;
 
     function render(n){
-      const str = String(n).padStart(6, '0');
-      digitsEl.innerHTML = '';
-      for(let i = 0; i < str.length; i++){
-        const d = document.createElement('span');
-        d.className = 'vc-digit';
-        d.textContent = str[i];
-        digitsEl.appendChild(d);
-      }
-      digitsEl.setAttribute('aria-label', 'Total visitors: ' + n.toLocaleString('en-IN'));
+      var s = String(Math.max(0, n)).padStart(6, '0');
+      box.innerHTML = s.split('').map(function(d){ return '<span class="vc-digit">' + d + '</span>'; }).join('');
+      box.setAttribute('aria-label', 'Total visitors: ' + n.toLocaleString('en-IN'));
     }
+    function store(k, v){ try{ localStorage.setItem(k, v); }catch(e){} }
+    function load(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
 
-    Promise.all([getBase(), getLive()]).then(([base, live])=>{
-      const total = live === null ? base : base + live;
-      if(total <= 0) return;                 // nothing real to show: keep the counter hidden
-      box.hidden = false;
-      const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      if(reduce || total < 2){ render(total); return; }
-      const start = performance.now(), dur = 1100;
-      (function tick(t){
-        const p = Math.min(1, (t - start) / dur);
-        render(Math.round(total * (1 - Math.pow(1 - p, 3))));
-        if(p < 1) requestAnimationFrame(tick);
-      })(start);
-    });
+    var cached = parseInt(load('dcc_count'), 10);
+    if(!isNaN(cached)) render(cached);
+
+    var ua = navigator.userAgent || '';
+    var isBot = /bot|crawl|spider|slurp|preview|headless|lighthouse|facebookexternalhit/i.test(ua);
+    var last = parseInt(load('dcc_visited_at'), 10);
+    var alreadyCounted = !isNaN(last) && (Date.now() - last) < TTL;
+    var shouldCount = !isBot && !alreadyCounted;
+
+    var base = 'https://api.counterapi.dev/v1/' + NAMESPACE + '/' + KEY;
+    var url = shouldCount ? base + '/up' : base;
+
+    fetch(url, {cache:'no-store'})
+      .then(function(r){ if(!r.ok) throw new Error('bad'); return r.json(); })
+      .then(function(data){
+        var n = (typeof data.count === 'number' ? data.count : parseInt(data.count, 10));
+        if(isNaN(n)) throw new Error('nan');
+        n += START;
+        render(n);
+        store('dcc_count', n);
+        if(shouldCount) store('dcc_visited_at', Date.now());
+      })
+      .catch(function(){
+        if(isNaN(cached) && wrap) wrap.hidden = true;
+      });
   })();
 </script>
 
